@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Personal Writing Analyzer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #121212;
+      color: #e0e0e0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      text-align: center;
+      color: #00bcd4;
+      font-size: 3em;
+      margin-bottom: 0.2em;
+    }
+    h2 {
+      text-align: center;
+      color: #bbb;
+      font-size: 1.2em;
+      margin-bottom: 1em;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    #loader {
+      display: none;
+      margin: 20px auto;
+      border: 6px solid #2e2e2e;
+      border-top: 6px solid #00bcd4;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      background: #2c2c2c;
+      color: #fff;
+      border: 1px solid #555;
+      padding: 12px;
+      font-size: 16px;
+      resize: vertical;
+      margin-bottom: 10px;
+      border-radius: 8px;
+    }
+    button {
+      display: inline-block;
+      padding: 12px 28px;
+      background: #00bcd4;
+      color: #000;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      font-size: 1.2em;
+      border-radius: 6px;
+      transition: 0.3s ease;
+      box-shadow: 0 0 15px rgba(0, 188, 212, 0.3);
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #4dd0e1;
+      transform: scale(1.05);
+      box-shadow: 0 0 25px rgba(33, 150, 243, 0.6);
+    }
+    #sttStatus {
+      margin-left: 10px;
+      font-style: italic;
+      color: #4dd0e1;
+    }
+    .results {
+      margin-top: 30px;
+      padding: 20px;
+      background: #1d1d1d;
+      border: 1px solid #444;
+      border-radius: 8px;
+    }
+    .section-title {
+      font-size: 1.5em;
+      margin-top: 30px;
+      color: #4dd0e1;
+      border-bottom: 1px solid #555;
+      padding-bottom: 5px;
+    }
+    footer {
+      margin-top: 50px;
+      text-align: center;
+      font-size: 0.9em;
+      color: #888;
+    }
+    .loading {
+      font-style: italic;
+      color: #aaa;
+    }
+    .input-label {
+      font-size: 1.2em;
+      margin-bottom: 5px;
+      display: block;
+    }
+    .analysis-container {
+      background-color: #222;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .info-tip {
+      font-size: 0.9em;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+    .toggle-section {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      margin-bottom: 15px;
+    }
+    .toggle-section label {
+      font-size: 0.95em;
+    }
+    .disclaimer {
+      font-size: 0.9em;
+      color: #bbb;
+      margin-top: -10px;
+      margin-bottom: 20px;
+      font-style: italic;
+    }
+    .bar {
+      height: 10px;
+      background-color: #00bcd4;
+      margin-top: 4px;
+      margin-bottom: 12px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Text Writing Analyzer</h1>
+    <h2>Powered by IBM Watson NLU and STT</h2>
+
+    <label class="input-label" for="textInput">Paste your writing:</label>
+    <textarea id="textInput" placeholder="Write or paste your text here..."></textarea>
+    <div>
+      <button onclick="startSTT()">Speak</button>
+      <button onclick="clearText()" style="margin-left:10px; background-color:#ff5252; color:white;">🧹 Clear</button>
+      <span id="sttStatus" class="loading"></span>
+    </div>
+
+    <div class="info-tip">Analyze tone, emotion, sentiment, and extract keywords and categories.</div>
+    <div class="disclaimer">* Emotion scores range from 0 (no emotion) to 1 (very strong emotion)</div>
+
+    <div class="toggle-section">
+      <label><input type="checkbox" id="includeSentiment" checked /> Sentiment</label>
+      <label><input type="checkbox" id="includeEmotion" checked /> Emotion</label>
+      <label><input type="checkbox" id="includeKeywords" checked /> Keywords</label>
+      <label><input type="checkbox" id="includeCategories" checked /> Categories</label>
+    </div>
+
+    <button onclick="analyzeText()">Analyze Text</button>
+    <div id="loader"></div>
+    <div class="results" id="outputArea"></div>
+
+    <footer>
+      Built by Adit Singh Rathore | Uses IBM Cloud Natural Language Understanding & Speech to Text
+    </footer>
+  </div>
+
+  <script>
+    function clearText() {
+      document.getElementById("textInput").value = "";
+      document.getElementById("outputArea").innerHTML = "";
+    }
+
+    async function analyzeText() {
+      const text = document.getElementById("textInput").value.trim();
+      const output = document.getElementById("outputArea");
+      const loader = document.getElementById("loader");
+      output.innerHTML = "";
+      if (!text) {
+        output.innerText = "Please enter some text before analyzing.";
+        return;
+      }
+
+      loader.style.display = "block";
+
+      const features = {};
+      if (document.getElementById("includeSentiment").checked) features.sentiment = {};
+      if (document.getElementById("includeEmotion").checked) features.emotion = {};
+      if (document.getElementById("includeKeywords").checked) features.keywords = { limit: 5 };
+      if (document.getElementById("includeCategories").checked) features.categories = { limit: 3 };
+
+      const apiKey = "u4xBh4JoioNcuEjuGDi8meCTUlpakFRDPx4o9y8LjvU8";
+      const apiUrl = "https://api.au-syd.natural-language-understanding.watson.cloud.ibm.com/instances/3061fbc1-35bc-4200-8410-df31db732085/v1/analyze?version=2021-08-01";
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Basic " + btoa("apikey:" + apiKey)
+          },
+          body: JSON.stringify({ text, features })
+        });
+
+        loader.style.display = "none";
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error("HTTP " + response.status + ": " + errorBody);
+        }
+
+        const data = await response.json();
+        let outputHtml = `<div class="analysis-container">`;
+
+        if (data.sentiment?.document) {
+          const sentiment = data.sentiment.document;
+          outputHtml += `<div class="section-title">🔹 Sentiment</div><p><strong>Label:</strong> ${sentiment.label} <br><strong>Score:</strong> ${sentiment.score}</p>`;
+        }
+
+        if (data.emotion?.document?.emotion) {
+          outputHtml += `<div class="section-title">🔹 Emotion</div>`;
+          const emotions = data.emotion.document.emotion;
+          for (const [emotion, score] of Object.entries(emotions)) {
+            outputHtml += `<p><strong>${emotion.charAt(0).toUpperCase() + emotion.slice(1)}:</strong> ${score}</p>
+                          <div class="bar" style="width: ${score * 100}%"></div>`;
+          }
+        }
+
+        if (data.keywords && data.keywords.length > 0) {
+          outputHtml += `<div class="section-title">🔹 Keywords</div><ul>`;
+          data.keywords.forEach(k => {
+            outputHtml += `<li><strong>${k.text}</strong> (Relevance: ${k.relevance})</li>`;
+          });
+          outputHtml += `</ul>`;
+        }
+
+        if (data.categories && data.categories.length > 0) {
+          outputHtml += `<div class="section-title">🔹 Categories</div><ul>`;
+          data.categories.forEach(cat => {
+            outputHtml += `<li><strong>${cat.label}</strong> (Confidence: ${cat.score})</li>`;
+          });
+          outputHtml += `</ul>`;
+        }
+
+        outputHtml += `</div>`;
+        output.innerHTML = outputHtml;
+
+      } catch (err) {
+        loader.style.display = "none";
+        output.innerHTML = `Error: ${err.message}`;
+      }
+    }
+
+    async function startSTT() {
+      const status = document.getElementById("sttStatus");
+      status.textContent = "Listening...";
+
+      const speechApiKey = "aQvmpOt2l_udfv8PA2Mp7XO1sJgyZKF5Kfa1DdoubGSq";
+      const speechUrl = "https://api.au-syd.speech-to-text.watson.cloud.ibm.com/instances/09320fa8-e200-46e9-bbb2-162776c8b898/v1/recognize";
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        const chunks = [];
+
+        recorder.ondataavailable = e => chunks.push(e.data);
+        recorder.onstop = async () => {
+          const blob = new Blob(chunks, { type: "audio/webm" });
+
+          const response = await fetch(speechUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "audio/webm",
+              "Authorization": "Basic " + btoa("apikey:" + speechApiKey)
+            },
+            body: blob
+          });
+
+          const result = await response.json();
+          if (result.results && result.results.length > 0) {
+            const transcript = result.results.map(r => r.alternatives[0].transcript).join(' ');
+            document.getElementById("textInput").value += transcript;
+          } else {
+            alert("No speech detected.");
+          }
+          status.textContent = "";
+        };
+
+        recorder.start();
+        setTimeout(() => recorder.stop(), 5000);
+      } catch (err) {
+        status.textContent = "";
+        alert("🎤 Microphone access failed: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
